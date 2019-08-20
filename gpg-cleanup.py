@@ -28,17 +28,32 @@ def check_requirements():
 
 	# Check gpg public key files
 
+def add_fingerprint(line):
+	match = re.search('^fpr:::::::::([A-F0-9]+):', line)
+	if match:
+		fprs.append(match.group(1))
+
+# Check requirements, command line
 check_requirements()
 
-print("Using input file {}".format(GPGLOG))
+# Retrieve public keys fingerprints 
+if Path(GPGLOG).is_file():
+	print("Using input file {}".format(GPGLOG))
 
-with open(GPGLOG) as file_log:
-	for pubkeys_line in file_log:
-		# Search for fingerprint lines
-		match = re.search('^fpr:::::::::([A-F0-9]+):', pubkeys_line)
-		if match:
-			fprs.append(match.group(1))
+	with open(GPGLOG) as file_log:
+		for pubkey_line in file_log:
+			# Search for fingerprint lines
+			add_fingerprint(pubkey_line)
+else:
+	try:
+		proc = subprocess.run(["gpg", "--with-colons", "--list-keys"], stdout=subprocess.PIPE, check=True, timeout=120, encoding='utf-8')
+	except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+		sys.exit('ERROR: Unable to list public keys: {}'.format(str(e)))
+	else:
+		for pubkey_line in proc.stdout.split('\n'):
+			add_fingerprint(pubkey_line)
 
+# List signatures for each public key to find out if key is ok
 for fpr in fprs:
 	sig_count = 0
 	uid = ""
@@ -67,6 +82,7 @@ for fpr in fprs:
 
 	print('{} - Number of signatures: {}'.format(fpr, sig_count))
 
+# Delete suspicious public keys from keyring
 for fpr in delpubkeys:
 	ret = input('Do you want to delete public key "{}" ({} signatures listed in {:.2f} sec)? [y|N] >'.format(fpr, delpubkeys[fpr].sig_count, delpubkeys[fpr].elapsed))
 	if ret.lower() == "y":
