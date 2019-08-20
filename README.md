@@ -2,7 +2,7 @@
 Cleanup of public keys in your gpg keyring
 
 ## Motivation
-Recently pgp public keyservers were flooded with poisoned public keys. Those public keys have been signed by a large number of fake users. If you try to list those pubic keys with GnuPG it will take a very long time (maybe 10 minutes, maybe 30 minutes, maybe even longer). gpg-cleanup tries to identify those public keys with a very large number of signatures and help you delete them.
+Recently pgp public keyservers were flooded with **poisoned public keys**. Those keys have been signed by a large number of fake users and therefore contain more signatures than GnuPG can handle. If you try to list those pubic keys with GnuPG it will take a very long time (maybe 10 minutes, maybe 30 minutes, maybe even longer). gpg-cleanup tries to identify those public keys and help you delete them.
 
 ### How do I know if my GnuPG public keyring contains those poisoned public keys?
 - Listing all your public keys takes a very long time. It seems as if the gpg command hangs.
@@ -10,6 +10,7 @@ Recently pgp public keyservers were flooded with poisoned public keys. Those pub
 - Your public keyring has a large disk size (maybe 20 MB, maybe even larger).
 
 Check the size of your public keyring:
+
 $ ls -hl ~/.gnupg/pubring.*
 
 ## Requirements
