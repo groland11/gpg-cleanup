@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+
 from os.path import expanduser
 from pathlib import Path
 import sys, re, subprocess, time
@@ -39,13 +40,13 @@ with open(GPGLOG) as file_log:
 			fprs.append(match.group(1))
 
 for fpr in fprs:
+	sig_count = 0
+	uid = ""
+	elapsed = 0.0
 	try:
-		sig_count = 0
-		uid = ""
 		start = time.time()
-		proc = subprocess.run(["gpg", "--list-sig", fpr], stdout=subprocess.PIPE, check=True, timeout=180, encoding='utf-8')
+		proc = subprocess.run(["gpg", "--list-sig", fpr], stdout=subprocess.PIPE, check=True, timeout=20, encoding='utf-8')
 		elapsed = time.time() - start
-		# sig          283B6394008969C8 2019-07-06  [User ID not found]
 		for sigs_line in proc.stdout.split('\n'):
 			match = re.search('^sig[ \t]+', sigs_line)
 			if match:
@@ -58,17 +59,22 @@ for fpr in fprs:
 			delpubkeys[fpr] = PubKey(fpr, uid, sig_count, elapsed)
 
 	except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+		if elapsed == 0.0:
+			elapsed = time.time() - start
 		print('ERROR: Unable to list signatures for key {}: {}'.format(fpr, str(e)))
+		delpubkeys[fpr] = PubKey(fpr, uid, sig_count, elapsed)
 		pass
 
 	print('{} - Number of signatures: {}'.format(fpr, sig_count))
 
 for fpr in delpubkeys:
-	ret = raw_input('Do you want to delete public key "{}" ({} signatures in {:.2f} sec)? [y|N] >'.format(fpr, delpubkeys[fpr].sigcount, delpubkeys[fpr].elapsed))
+	ret = input('Do you want to delete public key "{}" ({} signatures listed in {:.2f} sec)? [y|N] >'.format(fpr, delpubkeys[fpr].sig_count, delpubkeys[fpr].elapsed))
 	if ret.lower() == "y":
 		try:
 			proc = subprocess.run(["gpg", "--delete-keys", fpr], stdout=subprocess.PIPE, check=True, timeout=180, encoding='utf-8')
 		except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
 			print('ERROR: Unable to delete key {}: {}'.format(fpr, str(e)))
 			pass
+		else:
+			print('OK: Successfully deleted public key {}'.format(fpr))
 
