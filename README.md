@@ -28,6 +28,20 @@ Note that starting from GnuPG 2.1, public keys may be stored in one of two files
 Either one of those two files may be used by GnuPG and may be very large.
 
 ## Command line options
+```
+gpg-cleanup.py [-h] [-v] [-w [WRITECACHE] | -r [READCACHE]]
+                      [-t TIMEOUT]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -v, --version         Show program's version and exit.
+  -w [WRITECACHE], --writecache [WRITECACHE]
+                        Create cache file (default: '~/pubkeys.txt') and exit.
+  -r [READCACHE], --readcache [READCACHE]
+                        Read from cache file (default: '~/pubkeys.txt').
+  -t TIMEOUT, --timeout TIMEOUT
+                        Timeout in seconds for gpg (default: 120).
+```
 
 ## Example usage
 
