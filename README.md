@@ -46,13 +46,13 @@ optional arguments:
 ## Example usage
 Here is an example how you might use this tool:
 
-1. Create a cache file with a list of all your public keys. `gpg --list-keys` might take a long time to finish, so storing the result in a cache file for later use might be a good idea. On my computer with just a handful of public keys, `gpg --list-keys` takes more than 6 minutes.
+1. ***Create a cache*** file with a list of all your public keys. `gpg --list-keys` might take a long time to finish, so storing the result in a cache file for later use might be a good idea. On my computer with just a handful of public keys, `gpg --list-keys` takes more than 6 minutes.
 ```
 $ gpg-cleanup.py -c ./pubkeys.cache
 Creating cache file ./pubkeys.cache ...
 OK: The file ./pubkeys.cache now contains a list of all your public keys (elapsed time: 375.92 sec)
 ```
-2. List all signatures of all public keys using the cache file
+2. ***List all signatures*** of all public keys using the cache file
 ```
 $ gpg-cleanup.py -r ./pubkeys.cache
 ```
