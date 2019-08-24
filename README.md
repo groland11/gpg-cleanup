@@ -2,9 +2,11 @@
 Cleanup of public keys in your gpg keyring
 
 ## Motivation
-Recently pgp public keyservers were flooded with **poisoned public keys**. Those keys have been signed by a large number of fake users and therefore contain more signatures than GnuPG can handle. If you try to list those pubic keys with GnuPG it will take a very long time (maybe 10 minutes, maybe 30 minutes, maybe even longer). gpg-cleanup tries to identify those public keys and help you delete them.
+Recently pgp public keyservers were flooded with **poisoned public keys**. Those keys have been signed by a large number of fake users and therefore contain more signatures than GnuPG can handle. If you try to list those public keys with GnuPG it will take a very long time (maybe 10 minutes, maybe 30 minutes, maybe even days).
 
-Some notable background links:
+gpg-cleanup tries to identify those public keys and help you delete them within a reasonable amount of time. It lets you first create a cache file that you can run in the bacground over night or over the weekend. After you created the cache file, you run gpg-cleanup again to interactively delete all suspicious keys from your public keyring.
+
+Some notable background information links:
 - https://lwn.net/Articles/792366/
 - https://lwn.net/Articles/792534/
 
