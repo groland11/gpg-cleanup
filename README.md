@@ -36,17 +36,30 @@ optional arguments:
   -h, --help            show this help message and exit
   -v, --version         Show program's version and exit.
   -w [WRITECACHE], --writecache [WRITECACHE]
-                        Create cache file (default: '~/pubkeys.txt') and exit.
+                        Create cache file (default: '~/pubkeys.cache') and exit.
   -r [READCACHE], --readcache [READCACHE]
-                        Read from cache file (default: '~/pubkeys.txt').
+                        Read from cache file (default: '~/pubkeys.cache').
   -t TIMEOUT, --timeout TIMEOUT
                         Timeout in seconds for gpg (default: 120).
 ```
 
 ## Example usage
+Here is an example how you might use this tool:
+
+1. Create a cache file with a list of all your public keys. `gpg --list-keys` might take a long time to finish, so storing the result in a cache file for later use might be a good idea. On my computer with just a handful of public keys, `gpg --list-keys` takes more than 6 minutes.
+```
+$ gpg-cleanup.py -c ./pubkeys.cache
+Creating cache file ./pubkeys.cache ...
+OK: The file ./pubkeys.cache now contains a list of all your pubic keys (elapsed time: 375.92 sec)
+```
+2. List all signatures of all public keys using the cache file
+```
+$ gpg-cleanup.py -r ./pubkeys.cache
+```
 
 ## Troubleshooting
 
 ## FAQ
 #### Why do you want to delete those keys from your public keyring? The keys themselves are ok, just the signatures are phoney, right?
 Yes, the public keys are perfectly fine. But once they are signed by a large number of fake users, they are practically useless. The owner of those public keys could try to delete those signatures and republish his public key, but there is no guarantee that poisoning of his public key won't happen again. The next best thing would be to create a new PGP key and publish it on https://keys.openpgp.org, which does not rely on signatures but rather identifies users by email.
+
