@@ -34,7 +34,7 @@ from pathlib import Path
 
 HOMEDIR = expanduser("~")
 GPGDIR  = HOMEDIR + "/.gnupg"
-GPGLOG  = HOMEDIR + "/pubkeys.txt"
+GPGLOG  = HOMEDIR + "/pubkeys.cache"
 GNUPGHOME = ""
 
 fprs = []
@@ -53,6 +53,13 @@ def check_requirements():
 		sys.exit('ERROR: Invalid home directory "{}"'.format(HOMEDIR))
 
 	# Check gpg version
+	try:
+		output = subprocess.check_output("gpg --version | egrep -i -o \"[0-9.]+\" | head -1", shell=True, universal_newlines=True, timeout=10)
+		ver = output.strip()
+		if ver < "2.1":
+			sys.exit('ERROR: gpg version must be at least 2.1 (your version: {})'.format(ver))
+	except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+		sys.exit('ERROR: Unable to retrieve gpg version: {}'.format(str(e)))
 
 	# Check gpg home directory
 	if not Path(GPGDIR).is_dir() or not access(GPGDIR, W_OK):
@@ -71,8 +78,8 @@ check_requirements()
 ap = argparse.ArgumentParser()
 group = ap.add_mutually_exclusive_group()
 ap.add_argument('-v', '--version', action='version', version='%(prog)s 0.1a', help="Show program's version and exit.")
-group.add_argument("-w", "--writecache", required=False, nargs='?', const=GPGLOG, help="Create cache file (default: '~/pubkeys.txt') and exit.")
-group.add_argument("-r", "--readcache", required=False, nargs='?', const=GPGLOG, help="Read from cache file (default: '~/pubkeys.txt').")
+group.add_argument("-w", "--writecache", required=False, nargs='?', const=GPGLOG, help="Create cache file (default: '~/pubkeys.cache') and exit.")
+group.add_argument("-r", "--readcache", required=False, nargs='?', const=GPGLOG, help="Read from cache file (default: '~/pubkeys.cache').")
 ap.add_argument("-t", "--timeout", required=False, default=120, type=int, help="Timeout in seconds for gpg (default: 120).")
 args = ap.parse_args()
 
@@ -93,7 +100,7 @@ if args.writecache:
 		sys.exit('ERROR: Unable to write cache file {}: {}'.format(args.writecache, str(e)))
 	else:
 		elapsed_time = time.time() - start_time
-		print("OK: The file {} now contains a list of all your pubic keys (elapsed time: {:.2f} sec)".format(args.writecache, elapsed_time))
+		print("OK: The file {} now contains a list of all your public keys (elapsed time: {:.2f} sec)".format(args.writecache, elapsed_time))
 	sys.exit()
 
 # Retrieve public keys fingerprints from cache file
