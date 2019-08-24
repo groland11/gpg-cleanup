@@ -5,8 +5,8 @@ Cleanup of public keys in your gpg keyring
 Recently pgp public keyservers were flooded with **poisoned public keys**. Those keys have been signed by a large number of fake users and therefore contain more signatures than GnuPG can handle. If you try to list those pubic keys with GnuPG it will take a very long time (maybe 10 minutes, maybe 30 minutes, maybe even longer). gpg-cleanup tries to identify those public keys and help you delete them.
 
 Some notable background links:
-https://lwn.net/Articles/792366/
-https://lwn.net/Articles/792534/
+- https://lwn.net/Articles/792366/
+- https://lwn.net/Articles/792534/
 
 ### How do I know if my GnuPG public keyring contains those poisoned public keys?
 - Listing all of your public keys takes a very long time. It seems as if the gpg command hangs.
@@ -50,16 +50,19 @@ optional arguments:
 ## Example usage
 Here is an example how you might use this tool:
 
-1. **Create a cache** file with a list of all your public keys. `gpg --list-keys` might take a long time to finish, so storing the result in a cache file for later use might be a good idea. On my computer with just a handful of public keys, `gpg --list-keys` takes more than 6 minutes.
+1. **Create a cache file** with a list of all your public keys. `gpg --list-keys` might take a long time to finish, so storing the result in a cache file for later use might be a good idea. On my computer with just a handful of public keys, `gpg --list-keys` takes more than 6 minutes.
 ```
-$ gpg-cleanup.py -c ./pubkeys.cache
+$ gpg-cleanup.py -c ./pubkeys.cache -t 86400
 Creating cache file ./pubkeys.cache ...
 OK: The file ./pubkeys.cache now contains a list of all your public keys (elapsed time: 375.92 sec)
 ```
-2. **List all signatures** of all public keys using the cache file
+Set the timeout to a high value (here: 1 day) so you can let the program run over night or even over the weekend.
+
+2. **List all signatures** of all public keys using the cache file from step 1
 ```
-$ gpg-cleanup.py -r ./pubkeys.cache
+$ gpg-cleanup.py -r ./pubkeys.cache -t 120
 ```
+Set the timeout to a much lower value because you want to interactively delete poisoned keys.
 
 ## Troubleshooting
 
