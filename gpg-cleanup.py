@@ -94,8 +94,22 @@ if args.writecache:
 
 	try:
 		with open(args.writecache, 'w') as file_cache:
+			fpr = ""
 			for pubkey_line in proc.stdout.split('\n'):
-				file_cache.write(pubkey_line + '\n')
+				match = re.search('^pub:', line)
+				if match:
+					if fpr != "":
+						file_cache.write(pubkey_line + '\n')
+					fpr = ""
+					continue
+				match = re.search('^fpr:::::::::([A-F0-9]+):', line)
+				if match:
+					fpr = match.group(1)
+					continue
+				match = re.search("^uid:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:([^:]*):[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:", line)
+				if match:
+					uids.append(match.group(1))
+					continue
 	except IOError as e:
 		sys.exit('ERROR: Unable to write cache file {}: {}'.format(args.writecache, str(e)))
 	else:
@@ -120,6 +134,9 @@ else:
 	else:
 		for pubkey_line in proc.stdout.split('\n'):
 			add_fingerprint(pubkey_line)
+
+# Give some statistics
+
 
 # List signatures for each public key to find out if key is ok
 for fpr in fprs:
