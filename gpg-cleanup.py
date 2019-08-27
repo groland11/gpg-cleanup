@@ -25,6 +25,11 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+# ToDo:
+# - Print expiration date
+# - Print user ids in delete dialog
+# - Parameter for max. number of signatures
+
 import sys, re, subprocess, time
 import argparse
 
@@ -156,7 +161,7 @@ else:
 
 # Give some statistics
 print("You have {} keys in you public keyring.".format(len(pubkeys)))
-print("Getting signatures of public keys ...")
+print("Getting signatures of those public keys ...")
 
 # List signatures for each public key to find out if key is suspicious
 for pubkey in pubkeys:
@@ -166,7 +171,7 @@ for pubkey in pubkeys:
 
 	try:
 		start = time.time()
-		proc = subprocess.run(["gpg", "--list-sig", pubkey.fpr], stdout=subprocess.PIPE, check=True, timeout=20, encoding='utf-8')
+		proc = subprocess.run(["gpg", "--list-sig", pubkey.fpr], stdout=subprocess.PIPE, check=True, timeout=args.timeout, encoding='utf-8')
 		elapsed = time.time() - start
 		for sigs_line in proc.stdout.split('\n'):
 			match = re.search('^sig[ \t]+', sigs_line)
@@ -177,13 +182,13 @@ for pubkey in pubkeys:
 				uid = match.group(1)
 
 		if sig_count > 200:
-			delpubkeys[pubkey.fpr] = PubKey(pubkey.fpr, pubkey.uids, sig_count, elapsed)
+			delpubkeys[pubkey.fpr] = Pubkey(pubkey.fpr, pubkey.uids, sig_count, elapsed)
 
 	except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
 		if elapsed == 0.0:
 			elapsed = time.time() - start
 		print('ERROR: Unable to list signatures for key {}: {}'.format(pubkey.fpr, str(e)))
-		delpubkeys[pubkey.fpr] = PubKey(pubkey.fpr, pubkey.uids, sig_count, elapsed)
+		delpubkeys[pubkey.fpr] = Pubkey(pubkey.fpr, pubkey.uids, sig_count, elapsed)
 		pass
 
 	print('{} - Number of signatures: {}'.format(pubkey.fpr, sig_count))
@@ -191,14 +196,18 @@ for pubkey in pubkeys:
 		print('\t{}'.format(uid))
 
 # Delete suspicious public keys from keyring
-for fpr in delpubkeys:
-	ret = input('Do you want to delete public key "{}" ({} signatures listed in {:.2f} sec)? [y|N] >'.format(fpr, delpubkeys[fpr].sig_count, delpubkeys[fpr].elapsed))
-	if ret.lower() == "y":
-		try:
-			proc = subprocess.run(["gpg", "--delete-keys", fpr], stdout=subprocess.PIPE, check=True, timeout=180, encoding='utf-8')
-		except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
-			print('ERROR: Unable to delete key {}: {}'.format(fpr, str(e)))
-			pass
-		else:
-			print('OK: Successfully deleted public key {}'.format(fpr))
+if len(delpubkeys) == 0:
+	print('OK: No suspicious signatures found in your public keyring')
+else:
+	for fpr in delpubkeys:
+		print('Public key with suspicous signatures: {} ({} signatures listed in {:.2f} sec)'.format(fpr, delpubkeys[fpr].sigcount, delpubkeys[fpr].elapsed))
+		ret = input('Do you want to delete this key? [y|N] >')
+		if ret.lower() == "y":
+			try:
+				proc = subprocess.run(["gpg", "--delete-keys", fpr], stdout=subprocess.PIPE, check=True, timeout=180, encoding='utf-8')
+			except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+				print('ERROR: Unable to delete key {}: {}'.format(fpr, str(e)))
+				pass
+			else:
+				print('OK: Successfully deleted public key {}'.format(fpr))
 
