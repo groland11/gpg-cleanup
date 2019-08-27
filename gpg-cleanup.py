@@ -31,21 +31,15 @@ import argparse
 from os import access, W_OK
 from os.path import expanduser
 from pathlib import Path
+from pubkey import Pubkey
 
 HOMEDIR = expanduser("~")
 GPGDIR  = HOMEDIR + "/.gnupg"
 GPGLOG  = HOMEDIR + "/pubkeys.cache"
 GNUPGHOME = ""
 
-fprs = []
+pubkeys = []
 delpubkeys = {}
-
-class PubKey:
-	def __init__(self, fpr, uid, sig_count, elapsed):
-		self.fpr       = fpr
-		self.sig_count = sig_count
-		self.elapsed   = elapsed
-		self.uid       = uid
 
 def check_requirements():
 	# Check home directory
@@ -67,10 +61,48 @@ def check_requirements():
 
 	# Check gpg public key files
 
-def add_fingerprint(line):
-	match = re.search('^fpr:::::::::([A-F0-9]+):', line)
-	if match:
-		fprs.append(match.group(1))
+def serialize(file_write, lines):
+	try:
+	    with open(file_write, 'w') as file_cache:
+		    for pubkey_line in lines:
+			    file_cache.write(pubkey_line + '\n')
+	except IOError as e:
+		sys.exit('ERROR: Unable to write cache file {}: {}'.format(file_write, str(e)))
+
+def deserialize(file_read=None, lines_read=None):
+	pubkeys_return = []
+
+	if file_read:
+		try:
+			with open(file_read, 'r') as file_cache:
+				lines_read = file_cache.readlines()
+		except IOError as e:
+			sys.exit('ERROR: Unable to read cache file {}: {}'.format(file_read, str(e)))
+	
+	if lines_read:
+		fpr = ""
+		uids = []
+		for pubkey_line in lines_read:
+			match = re.search('^pub:', pubkey_line)
+			if match:
+				if fpr != "":
+					pubkeys_return.append(Pubkey(fpr, uids))
+				fpr = ""
+				uids = []
+				continue
+			match = re.search('^fpr:::::::::([A-F0-9]+):', pubkey_line)
+			if match:
+				fpr = match.group(1)
+				continue
+			match = re.search("^uid:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:([^:]*):[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:", pubkey_line)
+			if match:
+				uids.append(match.group(1))
+				continue
+
+		if fpr != "":
+			pubkeys_return.append(Pubkey(fpr, uids))
+
+	return pubkeys_return
 
 # Check requirements, command line
 check_requirements()
@@ -87,65 +119,54 @@ args = ap.parse_args()
 if args.writecache:
 	print("Creating cache file {} ...".format(args.writecache))
 	start_time = time.time()
+
 	try:
 		proc = subprocess.run(["gpg", "--with-colons", "--list-keys"], stdout=subprocess.PIPE, check=True, timeout=args.timeout, encoding='utf-8')
 	except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
 		sys.exit('ERROR: Unable to list public keys: {}'.format(str(e)))
 
-	try:
-		with open(args.writecache, 'w') as file_cache:
-			fpr = ""
-			for pubkey_line in proc.stdout.split('\n'):
-				match = re.search('^pub:', line)
-				if match:
-					if fpr != "":
-						file_cache.write(pubkey_line + '\n')
-					fpr = ""
-					continue
-				match = re.search('^fpr:::::::::([A-F0-9]+):', line)
-				if match:
-					fpr = match.group(1)
-					continue
-				match = re.search("^uid:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:([^:]*):[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:", line)
-				if match:
-					uids.append(match.group(1))
-					continue
-	except IOError as e:
-		sys.exit('ERROR: Unable to write cache file {}: {}'.format(args.writecache, str(e)))
-	else:
-		elapsed_time = time.time() - start_time
-		print("OK: The file {} now contains a list of all your public keys (elapsed time: {:.2f} sec)".format(args.writecache, elapsed_time))
+	lines = []
+	for pubkey_line in proc.stdout.split('\n'):
+		lines.append(pubkey_line)
+
+	serialize(args.writecache, lines)
+
+	elapsed_time = time.time() - start_time
+	print("OK: The file {} now contains a list of all your public keys (elapsed time: {:.2f} sec)".format(args.writecache, elapsed_time))
 	sys.exit()
 
 # Retrieve public keys fingerprints from cache file
 if args.readcache:
 	if Path(args.readcache).is_file():
 		print("Using cache file {} ...".format(args.readcache))
-	
-		with open(args.readcache) as file_cache:
-			for pubkey_line in file_cache:
-				add_fingerprint(pubkey_line)
+		pubkeys = deserialize(file_read=args.readcache)
 # Retrieve public keys fingerprints from gpg
 else:
 	try:
 		proc = subprocess.run(["gpg", "--with-colons", "--list-keys"], stdout=subprocess.PIPE, check=True, timeout=args.timeout, encoding='utf-8')
 	except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
 		sys.exit('ERROR: Unable to list public keys: {}'.format(str(e)))
-	else:
-		for pubkey_line in proc.stdout.split('\n'):
-			add_fingerprint(pubkey_line)
+
+	lines = []
+	for pubkey_line in proc.stdout.split('\n'):
+		lines.append(pubkey_line)
+
+	print(lines)
+	pubkeys = deserialize(lines_read=lines)
 
 # Give some statistics
+print("You have {} keys in you public keyring.".format(len(pubkeys)))
+print("Getting signatures of public keys ...")
 
-
-# List signatures for each public key to find out if key is ok
-for fpr in fprs:
+# List signatures for each public key to find out if key is suspicious
+for pubkey in pubkeys:
 	sig_count = 0
 	uid = ""
 	elapsed = 0.0
+
 	try:
 		start = time.time()
-		proc = subprocess.run(["gpg", "--list-sig", fpr], stdout=subprocess.PIPE, check=True, timeout=20, encoding='utf-8')
+		proc = subprocess.run(["gpg", "--list-sig", pubkey.fpr], stdout=subprocess.PIPE, check=True, timeout=20, encoding='utf-8')
 		elapsed = time.time() - start
 		for sigs_line in proc.stdout.split('\n'):
 			match = re.search('^sig[ \t]+', sigs_line)
@@ -156,16 +177,18 @@ for fpr in fprs:
 				uid = match.group(1)
 
 		if sig_count > 200:
-			delpubkeys[fpr] = PubKey(fpr, uid, sig_count, elapsed)
+			delpubkeys[pubkey.fpr] = PubKey(pubkey.fpr, pubkey.uids, sig_count, elapsed)
 
 	except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
 		if elapsed == 0.0:
 			elapsed = time.time() - start
-		print('ERROR: Unable to list signatures for key {}: {}'.format(fpr, str(e)))
-		delpubkeys[fpr] = PubKey(fpr, uid, sig_count, elapsed)
+		print('ERROR: Unable to list signatures for key {}: {}'.format(pubkey.fpr, str(e)))
+		delpubkeys[pubkey.fpr] = PubKey(pubkey.fpr, pubkey.uids, sig_count, elapsed)
 		pass
 
-	print('{} - Number of signatures: {}'.format(fpr, sig_count))
+	print('{} - Number of signatures: {}'.format(pubkey.fpr, sig_count))
+	for uid in pubkey.uids:
+		print('\t{}'.format(uid))
 
 # Delete suspicious public keys from keyring
 for fpr in delpubkeys:
