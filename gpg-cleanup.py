@@ -103,6 +103,9 @@ else:
 	keylist.join()
 	progressbar.join()
 
+	if keylist.exc:
+		sys.exit('ERROR: Unable to retrieve public keys: {}'.format(keylist.exc))
+
 	# Write public keys to cache file and exit
 	if args.writecache:
 

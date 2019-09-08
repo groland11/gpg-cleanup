@@ -9,6 +9,7 @@ class KeyList(Thread):
 		Thread.__init__(self)
 		self.lines = []
 		self.timeout = timeout
+		self.exc = None
 
 	# Run gpg in thread to get public key list
 	def run(self):
@@ -16,6 +17,7 @@ class KeyList(Thread):
 		try:
 			proc = subprocess.run(['gpg', '--with-colons', '--list-keys'], stdout=subprocess.PIPE, check=True, timeout=self.timeout, encoding='utf-8')
 		except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+			self.exc = e
 			sys.exit('ERROR: Unable to list public keys (process error, timeout): {}'.format(str(e)))
 		else:
 			for pubkey_line in proc.stdout.split('\n'):
@@ -27,9 +29,9 @@ class KeyList(Thread):
 	# Write keylist to file
 	def serialize(self, file_write):
 		try:
-		    with open(file_write, 'w') as file_cache:
-			    for pubkey_line in self.lines:
-				    file_cache.write(pubkey_line + '\n')
+			with open(file_write, 'w') as file_cache:
+				for pubkey_line in self.lines:
+					file_cache.write(pubkey_line + '\n')
 		except IOError as e:
 			sys.exit('ERROR: Unable to write cache file {}: {}'.format(file_write, str(e)))
 	
