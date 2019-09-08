@@ -37,6 +37,8 @@ from os import access, W_OK
 from os.path import expanduser
 from pathlib import Path
 from pubkey import Pubkey
+from progressbar import ProgressBar
+from keylist import KeyList
 
 HOMEDIR = expanduser('~')
 GPGDIR  = HOMEDIR + '/.gnupg'
@@ -66,77 +68,6 @@ def check_requirements():
 
 	# Check gpg public key files
 
-def serialize(file_write, lines):
-	try:
-	    with open(file_write, 'w') as file_cache:
-		    for pubkey_line in lines:
-			    file_cache.write(pubkey_line + '\n')
-	except IOError as e:
-		sys.exit('ERROR: Unable to write cache file {}: {}'.format(file_write, str(e)))
-
-def deserialize(file_read=None, lines_read=None):
-	pubkeys_return = []
-
-	if file_read:
-		try:
-			with open(file_read, 'r') as file_cache:
-				lines_read = file_cache.readlines()
-		except IOError as e:
-			sys.exit('ERROR: Unable to read cache file {}: {}'.format(file_read, str(e)))
-	
-	if lines_read:
-		fpr = ''
-		uids = []
-		for pubkey_line in lines_read:
-			match = re.search('^pub:', pubkey_line)
-			if match:
-				if fpr != '':
-					pubkeys_return.append(Pubkey(fpr, uids))
-				fpr = ''
-				uids = []
-				continue
-			match = re.search('^fpr:::::::::([A-F0-9]+):', pubkey_line)
-			if match:
-				fpr = match.group(1)
-				continue
-			match = re.search('^uid:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:([^:]*):[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:', pubkey_line)
-			if match:
-				uids.append(match.group(1))
-				continue
-
-		if fpr != '':
-			pubkeys_return.append(Pubkey(fpr, uids))
-
-	return pubkeys_return
-
-# Show progressbar
-def progressbar(statustext):
-	os.popen('tput civis').read()
-	i = 0
-	while lock1.acquire(blocking=False) == False:
-		print('{} '.format(statustext), end='')
-		for j in range(0, i):
-			print('.', end='')
-		print('', end='\r')
-		time.sleep(1)
-		i = i + 1
-	print('')
-	os.popen('tput cnorm').read()
-
-# Retrieve public keys from gpg
-def gpg_listkeys():
-	try:
-		proc = subprocess.run(['gpg', '--with-colons', '--list-keys'], stdout=subprocess.PIPE, check=True, timeout=args.timeout, encoding='utf-8')
-	except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
-		sys.exit('ERROR: Unable to list public keys: {}'.format(str(e)))
-
-	for pubkey_line in proc.stdout.split('\n'):
-		lines.append(pubkey_line)
-
-	#time.sleep(5)
-
-	lock1.release()
-
 # Check requirements, command line, initialize threading
 check_requirements()
 
@@ -148,55 +79,45 @@ group.add_argument('-r', '--readcache', required=False, nargs='?', const=GPGLOG,
 ap.add_argument('-t', '--timeout', required=False, default=120, type=int, help='Timeout in seconds for gpg (default: 120).')
 args = ap.parse_args()
 
-lock1 = threading.Lock()
 
-# Write public keys to cache file and exit
-if args.writecache:
-
-	thread1 = threading.Thread(target=progressbar,  args=('Running gpg',))
-	thread2 = threading.Thread(target=gpg_listkeys)
-
-	lock1.acquire(blocking=False)
-
-	start_time = time.time()
-	lines = []
-
-	thread1.start()
-	thread2.start()
-
-	thread1.join()
-	thread2.join()
-
-	print('Creating cache file {} ...'.format(args.writecache))
-	serialize(args.writecache, lines)
-
-	elapsed_time = time.time() - start_time
-	print('OK: The file {} now contains a list of all your public keys (elapsed time: {:.2f} sec)'.format(args.writecache, elapsed_time))
-	sys.exit()
-
-# Retrieve public keys fingerprints from cache file
+# Transfer public keys from cache file into object array and continue
 if args.readcache:
 	if Path(args.readcache).is_file():
 		print('Using cache file {} ...'.format(args.readcache))
-		pubkeys = deserialize(file_read=args.readcache)
-# Retrieve public keys fingerprints from gpg
+		keylist = KeyList(args.timeout)
+		pubkeys = keylist.deserialize(file_read=args.readcache)
+	else:
+		sys.exit('ERROR: Unable to read cache file "{}"'.format(args.readcache))
+
+# Retrieve public keys directly from gpg
 else:
-	thread1 = threading.Thread(target=progressbar,  args=('Running gpg',))
-	thread2 = threading.Thread(target=gpg_listkeys)
-
-	lock1.acquire(blocking=False)
-
+	# Initialize threading to access gpg
 	start_time = time.time()
-	lines = []
 
-	thread1.start()
-	thread2.start()
+	keylist = KeyList(args.timeout)
+	progressbar = ProgressBar('Running gpg')
 
-	thread1.join()
-	thread2.join()
+	keylist.start()
+	progressbar.start()
 
-	print('Processing gpg output ...')
-	pubkeys = deserialize(lines_read=lines)
+	keylist.join()
+	progressbar.join()
+
+	# Write public keys to cache file and exit
+	if args.writecache:
+
+		print('Creating cache file {} ...'.format(args.writecache))
+		keylist.serialize(args.writecache)
+		elapsed_time = time.time() - start_time
+
+		print('OK: The file {} now contains a list of all your public keys (elapsed time: {:.2f} sec)'.format(args.writecache, elapsed_time))
+		sys.exit()
+
+	# Deserialize public keys into object array and continue
+	else:
+		print('Processing gpg output ...')
+		pubkeys = keylist.deserialize()
+		elapsed_time = time.time() - start_time
 
 # Give some statistics
 print('You have {} keys in you public keyring.'.format(len(pubkeys)))
