@@ -30,8 +30,7 @@
 # - Print user ids in delete dialog
 # - Parameter for max. number of signatures
 
-import sys, os, re, subprocess, time, threading
-import argparse
+import sys, os, re, subprocess, time, threading, logging, argparse
 
 from os import access, W_OK
 from os.path import expanduser
@@ -68,7 +67,7 @@ def check_requirements():
 
 	# Check gpg public key files
 
-# Check requirements, command line, initialize threading
+# Check requirements, command line, initialize logging
 check_requirements()
 
 ap = argparse.ArgumentParser()
@@ -80,10 +79,13 @@ ap.add_argument('-t', '--timeout', required=False, default=120, type=int, help='
 args = ap.parse_args()
 
 
+logformat = "%(asctime)s %(levelname)-8s %(message)s"
+logging.basicConfig(format=logformat, level=logging.INFO, datefmt="%Y-%m-%d %H:%M:%S")
+
 # Transfer public keys from cache file into object array and continue
 if args.readcache:
 	if Path(args.readcache).is_file():
-		print('Using cache file {} ...'.format(args.readcache))
+		logging.info('Using cache file %s ...', args.readcache)
 		keylist = KeyList(args.timeout)
 		pubkeys = keylist.deserialize(file_read=args.readcache)
 	else:
@@ -104,27 +106,32 @@ else:
 	progressbar.join()
 
 	if keylist.exc:
-		sys.exit('ERROR: Unable to retrieve public keys: {}'.format(keylist.exc))
+		msg = 'ERROR: Unable to retrieve public keys'
+		hint = ''
+		if type(keylist.exc) is subprocess.TimeoutExpired:
+			hint = 'Use -t command line option to extend timeout'
+		sys.exit('{}: {}\n{}'.format(msg, keylist.exc, hint))
 
 	# Write public keys to cache file and exit
 	if args.writecache:
 
-		print('Creating cache file {} ...'.format(args.writecache))
+		logging.info('Creating cache file %s ...', args.writecache)
 		keylist.serialize(args.writecache)
 		elapsed_time = time.time() - start_time
 
-		print('OK: The file {} now contains a list of all your public keys (elapsed time: {:.2f} sec)'.format(args.writecache, elapsed_time))
+		logging.info('The file %s now contains a list of all your public keys (elapsed time: %.2f sec)', args.writecache, elapsed_time)
+		logging.info('Use comannd line option -r to read this cache file and examine all public key signatures')
 		sys.exit()
 
 	# Deserialize public keys into object array and continue
 	else:
-		print('Processing gpg output ...')
+		logging.info('Processing gpg output ...')
 		pubkeys = keylist.deserialize()
 		elapsed_time = time.time() - start_time
 
 # Give some statistics
-print('You have {} keys in you public keyring.'.format(len(pubkeys)))
-print('Getting signatures of those public keys ...')
+logging.info('You have %d keys in you public keyring.', len(pubkeys))
+logging.info('Getting signatures of those public keys ...')
 
 # List signatures for each public key to find out if key is suspicious
 for pubkey in pubkeys:
@@ -150,27 +157,27 @@ for pubkey in pubkeys:
 	except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
 		if elapsed == 0.0:
 			elapsed = time.time() - start
-		print('ERROR: Unable to list signatures for key {}: {}'.format(pubkey.fpr, str(e)))
+		logging.error('Unable to list signatures for key %s: %s', pubkey.fpr, str(e))
 		delpubkeys[pubkey.fpr] = Pubkey(pubkey.fpr, pubkey.uids, sig_count, elapsed)
 		pass
 
-	print('{} - Number of signatures: {}'.format(pubkey.fpr, sig_count))
+	logging.info('%s - Number of signatures: %d', pubkey.fpr, sig_count)
 	for uid in pubkey.uids:
 		print('\t{}'.format(uid))
 
 # Delete suspicious public keys from keyring
 if len(delpubkeys) == 0:
-	print('OK: No suspicious signatures found in your public keyring')
+	logging.info('No suspicious signatures found in your public keyring')
 else:
 	for fpr in delpubkeys:
-		print('Public key with suspicous signatures: {} ({} signatures listed in {:.2f} sec)'.format(fpr, delpubkeys[fpr].sigcount, delpubkeys[fpr].elapsed))
+		logging.warning('Public key with suspicous signatures: %s (%d signatures listed in %.2f sec)', fpr, delpubkeys[fpr].sigcount, delpubkeys[fpr].elapsed)
 		ret = input('Do you want to delete this key? [y|N] >')
 		if ret.lower() == 'y':
 			try:
 				proc = subprocess.run(['gpg', '--delete-keys', fpr], stdout=subprocess.PIPE, check=True, timeout=180, encoding='utf-8')
 			except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
-				print('ERROR: Unable to delete key {}: {}'.format(fpr, str(e)))
+				logging.error('Unable to delete key %s: %s', fpr, str(e))
 				pass
 			else:
-				print('OK: Successfully deleted public key {}'.format(fpr))
+				logging.info('Successfully deleted public key %s', fpr)
 

@@ -8,14 +8,14 @@ class KeyList(Thread):
 	def __init__(self, timeout):
 		Thread.__init__(self)
 		self.lines = []
-		self.timeout = timeout
+		self._timeout = timeout
 		self.exc = None
 
 	# Run gpg in thread to get public key list
 	def run(self):
 		self.lock1.acquire(blocking=False)
 		try:
-			proc = subprocess.run(['gpg', '--with-colons', '--list-keys'], stdout=subprocess.PIPE, check=True, timeout=self.timeout, encoding='utf-8')
+			proc = subprocess.run(['gpg', '--with-colons', '--list-keys'], stdout=subprocess.PIPE, check=True, timeout=self._timeout, encoding='utf-8')
 		except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
 			self.exc = e
 			sys.exit('ERROR: Unable to list public keys (process error, timeout): {}'.format(str(e)))
