@@ -54,7 +54,7 @@ class KeyList(Thread):
 
         Thread.__init__(self)
         self.lines = []
-        self.timeout = timeout
+        self._timeout = timeout
         self.exc = None
 
     def run(self):
@@ -73,7 +73,7 @@ class KeyList(Thread):
             proc = subprocess.run(
                                   ['gpg', '--with-colons', '--list-keys'],
                                   stdout=subprocess.PIPE, check=True,
-                                  timeout=self.timeout, encoding='utf-8')
+                                  timeout=self._timeout, encoding='utf-8')
         except(
                 subprocess.CalledProcessError,
                 subprocess.TimeoutExpired) as e:
@@ -154,3 +154,4 @@ class KeyList(Thread):
                 pubkeys_return.append(Pubkey(fpr, uids))
 
         return pubkeys_return
+

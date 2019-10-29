@@ -31,6 +31,7 @@
 # - Parameter for max. number of signatures
 
 import argparse
+import logging
 from os import access, W_OK
 from os.path import expanduser
 from pathlib import Path
@@ -88,7 +89,7 @@ def check_requirements():
 
 
 def main():
-    # Check requirements, command line, initialize threading
+    # Check requirements, command line, initialize logging
     check_requirements()
 
     ap = argparse.ArgumentParser()
@@ -107,12 +108,15 @@ def main():
         help='Timeout in seconds for gpg (default: 120).')
     args = ap.parse_args()
 
+    logformat = "%(asctime)s %(levelname)-8s %(message)s"
+    logging.basicConfig(format=logformat, level=logging.INFO, datefmt="%Y-%m-%d %H:%M:%S")
+
     # Decide if we have to read public gpg keys from cache file or
     # read them on the fly from gpg
     if args.readcache:
         # Transfer public keys from cache file into object list and continue
         if Path(args.readcache).is_file():
-            print('Using cache file {} ...'.format(args.readcache))
+            logging.info('Using cache file %s ...', args.readcache)
             keylist = KeyList(args.timeout)
             pubkeys = keylist.deserialize(file_read=args.readcache)
         else:
@@ -133,33 +137,35 @@ def main():
         keylist.join()
         progressbar.join()
 
-        if keylist.exc:
-            sys.exit(
-                'ERROR: Unable to retrieve public keys: '
-                '{}'.format(keylist.exc))
+    if keylist.exc:
+        msg = 'ERROR: Unable to retrieve public keys'
+        hint = ''
+        if type(keylist.exc) is subprocess.TimeoutExpired:
+            hint = 'Use -t command line option to extend timeout'
+        sys.exit('{}: {}\n{}'.format(msg, keylist.exc, hint))
 
         # Write public keys to cache file and exit
         if args.writecache:
-            print('Creating cache file {} ...'.format(args.writecache))
+            logging.info('Creating cache file %s ...', args.writecache)
             keylist.serialize(args.writecache)
             elapsed_time = time.time() - start_time
 
-            print(
-                'OK: The file {} now contains a list of all your public keys '
+            logging.info(
+                'The file %s now contains a list of all your public keys '
                 '(elapsed time: '
-                '{:.2f} sec)'.format(args.writecache, elapsed_time))
+                '%.2f sec)', args.writecache, elapsed_time)
             sys.exit()
 
         # Deserialize public keys into object list and continue
         else:
-            print('Processing gpg output ...')
+            logging.info('Processing gpg output ...')
             pubkeys = keylist.deserialize()
             elapsed_time = time.time() - start_time
 
     # All public gpg keys should be stored in object list by now
     # Give some statistics
-    print('You have {} keys in you public keyring.'.format(len(pubkeys)))
-    print('Getting signatures of those public keys ...')
+    logging.info('You have %d keys in you public keyring.', len(pubkeys))
+    logging.info('Getting signatures of those public keys ...')
 
     # List signatures for each public key to find out if key is suspicious
     for pubkey in pubkeys:
@@ -195,30 +201,30 @@ def main():
             # signatures
             if elapsed == 0.0:
                 elapsed = time.time() - start
-            print('ERROR: Unable to list signatures for key '
-                  '{}: {}'.format(pubkey.fpr, str(e)))
+            logging.info('Unable to list signatures for key '
+                  '%s: %s', pubkey.fpr, str(e))
             delpubkeys[pubkey.fpr] = Pubkey(
                                             pubkey.fpr, pubkey.uids,
                                             sig_count, elapsed)
             pass
 
-        print('{} - Number of signatures: {}'.format(pubkey.fpr, sig_count))
+        logging.info('%s - Number of signatures: %d', pubkey.fpr, sig_count)
         for uid in pubkey.uids:
             print('\t{}'.format(uid))
 
     # Public keys with suspicious signatures should be stored
     # in object list right now
     if len(delpubkeys) == 0:
-        print('OK: No suspicious signatures found in your public keyring')
+        logging.info('No suspicious signatures found in your public keyring')
     else:
         # Let the user decide which public keys to delete from keyring
         for fpr in delpubkeys:
-            print(
+            logging.warning(
                 'Public key with suspicous signatures: {} '
                 '({} signatures listed in '
-                '{:.2f} sec)'.format(fpr,
-                                     delpubkeys[fpr].sigcount,
-                                     delpubkeys[fpr].elapsed))
+                '%.2f sec)', fpr,
+                             delpubkeys[fpr].sigcount,
+                             delpubkeys[fpr].elapsed)
             ret = input('Do you want to delete this key? [y|N] >')
             if ret.lower() == 'y':
                 try:
@@ -227,18 +233,16 @@ def main():
                         stdout=subprocess.PIPE,
                         check=True,
                         timeout=180,
-                        encoding='utf-8'
-                        )
+                        encoding='utf-8')
                 except(
                         subprocess.CalledProcessError,
                         subprocess.TimeoutExpired) as e:
-                    print(
-                        'ERROR: Unable to delete key {}: '
-                        '{}'.format(fpr, str(e))
-                        )
+                    logging.error(
+                        'Unable to delete key %s: '
+                        '%s', fpr, str(e))
                     pass
                 else:
-                    print('OK: Successfully deleted public key {}'.format(fpr))
+                    logging.info('Successfully deleted public key %s', fpr)
 
 
 if __name__ == '__main__':
