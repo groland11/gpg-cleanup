@@ -54,15 +54,49 @@ Here is an example how you might use this tool:
 
 1. **Create a cache file** with a list of all your public keys. `gpg --list-keys` might take a long time to finish, so storing the result in a cache file for later use might be a good idea. On my computer with just a handful of public keys, `gpg --list-keys` takes more than 6 minutes.
 ```
-$ gpg-cleanup.py -c ./pubkeys.cache -t 86400
-Creating cache file ./pubkeys.cache ...
-OK: The file ./pubkeys.cache now contains a list of all your public keys (elapsed time: 375.92 sec)
+$ gpg-cleanup.py -w ./pubkeys.cache -t 86400
+Running gpg ............................................................................................................................................................................................................................................
+2019-11-06 08:38:44 INFO     Creating cache file ./pubkeys.cache ...
+2019-11-06 08:38:44 INFO     The file ./pubkeys.cache now contains a list of all your public keys (elapsed time: 375.92 sec)
 ```
 Set the timeout to a high value (here: 1 day) so you can let the program run over night or even over the weekend.
 
 2. **List all signatures** of all public keys using the cache file from step 1
 ```
 $ gpg-cleanup.py -r ./pubkeys.cache -t 120
+2019-11-06 08:56:50 INFO     Using cache file ./pubkeys.cache ...
+2019-11-06 08:56:50 INFO     Processing gpg output ...
+2019-11-06 08:56:50 INFO     You have 113 keys in you public keyring.
+2019-11-06 08:56:50 INFO     Getting signatures of those public keys ...
+2019-11-06 08:56:50 INFO     D305F9A97514CF702C9D247190CA381837AD7647 - Number of signatures: 144
+        Marc Deslauriers <marcdeslauriers@videotron.ca>
+        Marc Deslauriers <mdeslaur@ubuntu.com>
+        Marc Deslauriers <mdeslaur@canonical.com>
+        Marc Deslauriers <marc.deslauriers@ubuntu.com>
+        Marc Deslauriers <marc.deslauriers@canonical.com>
+2019-11-06 08:56:50 INFO     2F1E45C56D00EB019231BFF9215553264598FBA7 - Number of signatures: 1333
+        Salvatore Bonaccorso <salvatore.bonaccorso@gmail.com>
+        Salvatore Bonaccorso <carnil@cpan.org>
+        Salvatore Bonaccorso <carnil@debian.org>
+        Salvatore Bonaccorso <bonaccos@ee.ethz.ch>
+        Salvatore Bonaccorso <carnil.debian@gmx.net>
+        Salvatore Bonaccorso <salvatore.bonaccorso@gmx.net>
+        Salvatore Bonaccorso <salvatore.bonaccorso@livenet.ch>
+...
+2019-11-06 08:56:50 INFO     C5986B4F1257FFA86632CBA746181433FBB75451 - Number of signatures: 102
+        Ubuntu CD Image Automatic Signing Key <cdimage@ubuntu.com>
+2019-11-06 08:56:50 INFO     843938DF228D22F7B3742BC0D94AA3F0EFE21092 - Number of signatures: 57
+        Ubuntu CD Image Automatic Signing Key (2012) <cdimage@ubuntu.com>
+2019-11-06 09:00:01 INFO     110775B5D101FB36BC6C911BEB774491D9FF06E2 - Number of signatures: 121201
+        Tor Browser Developers (signing key) <torbrowser@torproject.org>
+2019-11-06 09:00:01 INFO     0B957BB68F870C7F6BACBC4F55B65E5AD6B85D61 - Number of signatures: 52
+        Bürger-CERT Newsletter <buerger-cert-newsletter_pgp@newsletter.bund.de>
+2019-11-06 09:00:02 INFO     7DE94246A45F8FD06CC82D694BECFA6780121F18 - Number of signatures: 31
+        HPI Identity Leak Checker <sec-checker-admin@hpi.de>
+2019-11-06 09:00:02 WARNING  Public key with suspicous signatures: 2F1E45C56D00EB019231BFF9215553264598FBA7 (1333 signatures listed in 0.04 sec)
+Do you want to delete this key? [y|N] >n
+2019-11-06 09:07:14 WARNING  Public key with suspicous signatures: 110775B5D101FB36BC6C911BEB774491D9FF06E2 (121201 signatures listed in 191.39 sec)
+Do you want to delete this key? [y|N] >y
 ```
 Set the timeout to a much lower value because you want to interactively delete poisoned keys.
 
