@@ -111,6 +111,8 @@ def main():
     logformat = "%(asctime)s %(levelname)-8s %(message)s"
     logging.basicConfig(format=logformat, level=logging.INFO, datefmt="%Y-%m-%d %H:%M:%S")
 
+    start_time = time.time()
+
     # Decide if we have to read public gpg keys from cache file or
     # read them on the fly from gpg
     if args.readcache:
@@ -126,7 +128,6 @@ def main():
     else:
         # Retrieve public keys directly from gpg
         # Initialize threading to access gpg
-        start_time = time.time()
 
         keylist = KeyList(args.timeout)
         progressbar = ProgressBar('Running gpg')
