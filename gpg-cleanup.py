@@ -144,23 +144,23 @@ def main():
             hint = 'Use -t command line option to extend timeout'
         sys.exit('{}: {}\n{}'.format(msg, keylist.exc, hint))
 
-        # Write public keys to cache file and exit
-        if args.writecache:
-            logging.info('Creating cache file %s ...', args.writecache)
-            keylist.serialize(args.writecache)
-            elapsed_time = time.time() - start_time
+    # Write public keys to cache file and exit
+    if args.writecache:
+        logging.info('Creating cache file %s ...', args.writecache)
+        keylist.serialize(args.writecache)
+        elapsed_time = time.time() - start_time
 
-            logging.info(
-                'The file %s now contains a list of all your public keys '
-                '(elapsed time: '
-                '%.2f sec)', args.writecache, elapsed_time)
-            sys.exit()
+        logging.info(
+            'The file %s now contains a list of all your public keys '
+            '(elapsed time: '
+            '%.2f sec)', args.writecache, elapsed_time)
+        sys.exit()
 
-        # Deserialize public keys into object list and continue
-        else:
-            logging.info('Processing gpg output ...')
-            pubkeys = keylist.deserialize()
-            elapsed_time = time.time() - start_time
+    # Deserialize public keys into object list and continue
+    else:
+        logging.info('Processing gpg output ...')
+        pubkeys = keylist.deserialize()
+        elapsed_time = time.time() - start_time
 
     # All public gpg keys should be stored in object list by now
     # Give some statistics
@@ -194,7 +194,7 @@ def main():
             if sig_count > 200:
                 delpubkeys[pubkey.fpr] = Pubkey(
                                                 pubkey.fpr, pubkey.uids,
-                                                sig_count, elapsed)
+                                                sig_count, float(elapsed))
 
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
             # Something went wrong while trying to retrieve public key
@@ -205,7 +205,7 @@ def main():
                   '%s: %s', pubkey.fpr, str(e))
             delpubkeys[pubkey.fpr] = Pubkey(
                                             pubkey.fpr, pubkey.uids,
-                                            sig_count, elapsed)
+                                            sig_count, float(elapsed))
             pass
 
         logging.info('%s - Number of signatures: %d', pubkey.fpr, sig_count)
@@ -220,9 +220,9 @@ def main():
         # Let the user decide which public keys to delete from keyring
         for fpr in delpubkeys:
             logging.warning(
-                'Public key with suspicous signatures: {} '
-                '({} signatures listed in '
-                '%.2f sec)', fpr,
+                'Public key with suspicous signatures: %s '
+                '(%s signatures listed in '
+                '%s sec)', fpr,
                              delpubkeys[fpr].sigcount,
                              delpubkeys[fpr].elapsed)
             ret = input('Do you want to delete this key? [y|N] >')

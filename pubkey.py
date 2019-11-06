@@ -37,4 +37,4 @@ class Pubkey:
         self.fpr = fpr
         self.uids = uids
         self.sigcount = sigcount
-        self.elapsed = elapsed
+        self.elapsed = round(elapsed, 2)
