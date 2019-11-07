@@ -88,9 +88,16 @@ def check_requirements():
     # TODO: Check gpg public key files
 
 
-def main():
-    # Check requirements, command line, initialize logging
-    check_requirements()
+def get_commandline():
+    '''Parse command line arguments
+
+    Parameters
+    ----------
+
+    Returns
+    -------
+    argparse.Namespace object with attributes for all comand line parameters
+    '''
 
     ap = argparse.ArgumentParser()
     group = ap.add_mutually_exclusive_group()
@@ -106,10 +113,21 @@ def main():
     ap.add_argument(
         '-t', '--timeout', required=False, default=120, type=int,
         help='Timeout in seconds for gpg (default: 120).')
-    args = ap.parse_args()
+    return ap.parse_args()
 
+
+def main():
+    # Check requirements for converting document to thumbnail
+    check_requirements()
+
+    # Retrieve command line arguments
+    args = get_commandline()
+
+    # Initialize logging
     logformat = "%(asctime)s %(levelname)-8s %(message)s"
-    logging.basicConfig(format=logformat, level=logging.INFO, datefmt="%Y-%m-%d %H:%M:%S")
+    logging.basicConfig(format=logformat,
+                        level=logging.INFO,
+                        datefmt="%Y-%m-%d %H:%M:%S")
 
     start_time = time.time()
 
@@ -202,11 +220,13 @@ def main():
             # signatures
             if elapsed == 0.0:
                 elapsed = time.time() - start
-            logging.info('Unable to list signatures for key '
-                  '%s: %s', pubkey.fpr, str(e))
-            delpubkeys[pubkey.fpr] = Pubkey(
-                                            pubkey.fpr, pubkey.uids,
-                                            sig_count, float(elapsed))
+            logging.info('Unable to list signatures for key %s: %s',
+                         pubkey.fpr,
+                         str(e))
+            delpubkeys[pubkey.fpr] = Pubkey(pubkey.fpr,
+                                            pubkey.uids,
+                                            sig_count,
+                                            float(elapsed))
             pass
 
         logging.info('%s - Number of signatures: %d', pubkey.fpr, sig_count)
@@ -220,12 +240,11 @@ def main():
     else:
         # Let the user decide which public keys to delete from keyring
         for fpr in delpubkeys:
-            logging.warning(
-                'Public key with suspicous signatures: %s '
-                '(%s signatures listed in '
-                '%s sec)', fpr,
-                             delpubkeys[fpr].sigcount,
-                             delpubkeys[fpr].elapsed)
+            logging.warning('Public key with suspicous signatures: %s '
+                            '(%s signatures listed in %s sec)',
+                            fpr,
+                            delpubkeys[fpr].sigcount,
+                            delpubkeys[fpr].elapsed)
             ret = input('Do you want to delete this key? [y|N] >')
             if ret.lower() == 'y':
                 try:
